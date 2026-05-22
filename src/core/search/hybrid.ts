@@ -83,7 +83,12 @@ export function applyBacklinkBoost(
     if (floorThreshold !== undefined && r.score < floorThreshold) continue;
     const count = counts.get(r.slug) ?? 0;
     if (count > 0) {
-      r.score *= (1.0 + BACKLINK_BOOST_COEF * Math.log(1 + count));
+      const factor = 1.0 + BACKLINK_BOOST_COEF * Math.log(1 + count);
+      r.score *= factor;
+      // v0.40.4 attribution stamp (D12=A) — formatter reads this for
+      // --explain output. Stays undefined when count == 0 so the
+      // formatter can render "no boosts applied" honestly.
+      r.backlink_boost = factor;
     }
   }
 }
@@ -158,7 +163,10 @@ export function applySalienceBoost(
     const key = `${r.source_id ?? 'default'}::${r.slug}`;
     const score = scores.get(key);
     if (!score || score <= 0) continue;
-    r.score *= (1.0 + k * Math.log(1 + score));
+    const factor = 1.0 + k * Math.log(1 + score);
+    r.score *= factor;
+    // v0.40.4 attribution stamp (D12=A).
+    r.salience_boost = factor;
   }
 }
 
@@ -208,6 +216,8 @@ export function applyRecencyBoost(
     const recencyComponent = cfg.coefficient * cfg.halflifeDays / (cfg.halflifeDays + daysOld);
     const factor = 1.0 + strengthMul * recencyComponent;
     r.score *= factor;
+    // v0.40.4 attribution stamp (D12=A).
+    r.recency_boost = factor;
   }
 }
 
@@ -275,6 +285,16 @@ export async function runPostFusionStages(
   opts: PostFusionOpts,
 ): Promise<void> {
   if (results.length === 0) return;
+
+  // v0.40.4 attribution stamp (D12=A) — capture base_score ONCE at entry,
+  // BEFORE any boost mutates r.score. Without this, --explain can't
+  // reconstruct the pre-boost score. Idempotent: if base_score is
+  // already populated (caller stamped upstream), preserve it.
+  for (const r of results) {
+    if (r.base_score === undefined) {
+      r.base_score = r.score;
+    }
+  }
 
   // v0.35.6.0 [floor-ratio gate]: compute threshold ONCE at entry, BEFORE any
   // boost mutates scores. Single-baseline semantic — the same threshold gates

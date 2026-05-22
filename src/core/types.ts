@@ -521,7 +521,10 @@ export interface SearchResult {
   graph_cross_source_boost?: number;
   /** Multiplier applied by applyGraphSignals (session demote; <1.0). */
   session_demote_factor?: number;
-  /** Post-rerank score delta (final - pre-rerank). NULL when no reranker fired. */
+  /** Post-rerank rank delta: original_index - new_index in the reranker's
+   *  topNIn head. Positive means rank improved (moved closer to top).
+   *  Undefined when no reranker fired. The raw reranker relevance score
+   *  is separately stamped as `rerank_score` for back-compat. */
   reranker_delta?: number;
 }
 
