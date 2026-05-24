@@ -61,12 +61,19 @@ describeE2E('SIGCHLD handler reaps shell-job children (real binary)', () => {
     // uses. This boots through cli.ts so the SIGCHLD handler is installed,
     // then runs the jobs work daemon. GBRAIN_ALLOW_SHELL_JOBS=1 is required
     // for the shell handler to register.
+    // Forward DATABASE_URL explicitly so the subprocess can't fall through to
+    // any config-file-derived default (PGLite at $HOME/.gbrain/...) under
+    // run-e2e.sh's tmpdir HOME isolation, where the config file is absent.
     workerProc = spawn(
       'bun',
       ['run', 'src/cli.ts', 'jobs', 'work', '--concurrency', '1'],
       {
         cwd: process.cwd(),
-        env: { ...process.env, GBRAIN_ALLOW_SHELL_JOBS: '1' },
+        env: {
+          ...process.env,
+          GBRAIN_ALLOW_SHELL_JOBS: '1',
+          DATABASE_URL: process.env.DATABASE_URL ?? '',
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
@@ -110,7 +117,15 @@ describeE2E('SIGCHLD handler reaps shell-job children (real binary)', () => {
     for (const id of submittedJobIds) {
       try {
         execSync(`bun run src/cli.ts jobs delete ${id}`,
-          { cwd: process.cwd(), encoding: 'utf8', env: { ...process.env }, stdio: 'pipe' });
+          {
+            cwd: process.cwd(),
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              DATABASE_URL: process.env.DATABASE_URL ?? '',
+            },
+            stdio: 'pipe',
+          });
       } catch { /* best effort */ }
     }
   }, 30_000);
@@ -129,7 +144,11 @@ describeE2E('SIGCHLD handler reaps shell-job children (real binary)', () => {
           encoding: 'utf8',
           // GBRAIN_ALLOW_SHELL_JOBS=1 also gates the CLI submit path, not
           // just the worker that executes the job.
-          env: { ...process.env, GBRAIN_ALLOW_SHELL_JOBS: '1' },
+          env: {
+            ...process.env,
+            GBRAIN_ALLOW_SHELL_JOBS: '1',
+            DATABASE_URL: process.env.DATABASE_URL ?? '',
+          },
         },
       );
     } catch (e: unknown) {
@@ -156,7 +175,14 @@ describeE2E('SIGCHLD handler reaps shell-job children (real binary)', () => {
     while (Date.now() < deadline) {
       const out = execSync(
         `bun run src/cli.ts jobs get ${jobId}`,
-        { cwd: process.cwd(), encoding: 'utf8', env: { ...process.env } },
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DATABASE_URL: process.env.DATABASE_URL ?? '',
+          },
+        },
       );
       if (/COMPLETED/i.test(out)) {
         const m = out.match(/Result:\s+({.*})/);
