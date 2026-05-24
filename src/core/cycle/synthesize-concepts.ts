@@ -7,7 +7,7 @@
 //
 // Sequencing:
 //   1. Query all atom-typed pages from DB (excluding imported_from
-//      marker → atoms already extracted by wintermute don't get
+//      marker → atoms already extracted by your OpenClaw don't get
 //      re-synthesized as concepts here; their original concept pages
 //      come through greenfield import already).
 //   2. Group by `concepts:` frontmatter field on each atom (when the

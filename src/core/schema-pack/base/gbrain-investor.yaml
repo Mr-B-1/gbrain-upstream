@@ -1,7 +1,7 @@
 # gbrain-investor — investor/YC lens pack
 #
 # v0.41 lens packs wave. Declares the investor work surface that the user
-# (YC president) already runs every day across the wintermute agent + brain:
+# (YC president) already runs every day across the your OpenClaw agent + brain:
 #   - 501 investor profiles at brain/investors/
 #   - 19 deal memos at brain/investing/deals/
 #   - 5.3K companies + 24.6K people + 7.1K YC pages
@@ -33,9 +33,9 @@
 # The propose_takes phase populates take_domain_assignments rows at write
 # time from this pack's page_types → domain mapping (T10 wiring).
 #
-# Cron consolidation: existing wintermute crons (yc-radar-weekly,
+# Cron consolidation: existing your OpenClaw's crons (yc-radar-weekly,
 # yc-portfolio-health monthly, yc-oh-ingest daily) continue running on
-# their own schedules in wintermute — gbrain-investor doesn't displace
+# their own schedules in your OpenClaw — gbrain-investor doesn't displace
 # them, only declares their output types + calibration semantics. v0.42+
 # may migrate those crons too once their phase contracts stabilize.
 
@@ -125,7 +125,7 @@ calibration_domains:
     page_types:
       - thesis
 
-# Filing rules — mirror wintermute's existing layout so the v0.41
+# Filing rules — mirror your OpenClaw's existing layout so the v0.41
 # greenfield migration (T7) lands pages in their canonical locations.
 filing_rules:
   - kind: deal

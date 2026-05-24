@@ -196,7 +196,7 @@ describe('runEvalLongMemEval — methodology_note presence', () => {
 });
 
 describe('runEvalLongMemEval — perf gate preserved', () => {
-  test('run completes for the 2-question fixture in under 10s with stubs', async () => {
+  test('run completes for the 2-question fixture in under 30s with stubs', async () => {
     const state: StubState = { answerCalls: [], extractorCalls: 0 };
     const { answerClient, extractorClient } = stubClients(state);
     const start = Date.now();
@@ -205,6 +205,10 @@ describe('runEvalLongMemEval — perf gate preserved', () => {
       { client: answerClient, extractorClient, extractorModel: 'stub' },
     );
     const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(10_000);
+    // Cap is generous (30s) to absorb parallel-shard CPU contention. Test runs
+    // ~4s in isolation; the 8-shard fast loop pushed it to 16s under load and
+    // tripped the pre-v0.41 10s cap. 30s still catches genuine cold-path
+    // regressions (would push past 60s).
+    expect(elapsed).toBeLessThan(30_000);
   });
 });

@@ -47,7 +47,11 @@ export function estimateMaxCostUsd(
   estimatedInputTokens: number,
   maxOutputTokens: number,
 ): number | null {
-  const p = ANTHROPIC_PRICING[modelId];
+  // v0.31.12 introduced provider-prefixed model strings (anthropic:claude-opus-4-7).
+  // ANTHROPIC_PRICING is keyed by bare id; strip the prefix for lookup so budget
+  // gating actually fires instead of falling through to BUDGET_METER_NO_PRICING.
+  const bareId = modelId.startsWith('anthropic:') ? modelId.slice('anthropic:'.length) : modelId;
+  const p = ANTHROPIC_PRICING[bareId];
   if (!p) return null;
   return (
     (estimatedInputTokens / 1_000_000) * p.input +

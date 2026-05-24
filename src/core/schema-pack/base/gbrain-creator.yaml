@@ -1,7 +1,7 @@
 # gbrain-creator — content-creator lens pack
 #
 # v0.41 lens packs wave. Declares the atom + concept lifecycle that the
-# downstream wintermute agent ran via its own crons pre-v0.41:
+# downstream your OpenClaw agent ran via its own crons pre-v0.41:
 #
 #   - `atom` page type (NEW to base v0.40 — first introduced here):
 #     single-source extractive primitive from transcripts/meetings/articles.
@@ -13,7 +13,7 @@
 #     and writes voice-gated T1 Canon narratives via Sonnet.
 #
 # Cron consolidation: this pack's phases run inside the standard
-# `gbrain dream` cycle. No separate wintermute-side cron required.
+# `gbrain dream` cycle. No separate OpenClaw-side cron required.
 #
 # Calibration: declares `concept_themes` domain using the `cluster_summary`
 # aggregator (descriptive rollup, not Brier — concepts don't have binary
@@ -32,7 +32,7 @@
 api_version: gbrain-schema-pack-v1
 name: gbrain-creator
 version: 1.0.0
-description: "Content-creator lens. Atoms (single-source extractive nuggets) and concepts (aggregated themes T1-T4). Drives extract_atoms + synthesize_concepts cycle phases. When active, every gbrain dream tick walks recent transcripts/meetings/articles and produces tweetable atoms + tier-promoted concepts. Retires wintermute's parallel atom-pipeline-coordinator cron."
+description: "Content-creator lens. Atoms (single-source extractive nuggets) and concepts (aggregated themes T1-T4). Drives extract_atoms + synthesize_concepts cycle phases. When active, every gbrain dream tick walks recent transcripts/meetings/articles and produces tweetable atoms + tier-promoted concepts. Retires your OpenClaw's parallel atom-pipeline-coordinator cron."
 gbrain_min_version: 0.41.0
 extends: gbrain-base
 borrow_from: []
@@ -79,7 +79,7 @@ calibration_domains:
     page_types:
       - concept
 
-# Filing rules — date-bucketed atoms (mirrors wintermute's existing layout
+# Filing rules — date-bucketed atoms (mirrors your OpenClaw's existing layout
 # at ~/git/brain/atoms/{YYYY-MM-DD}/{slug}.md so greenfield migration lands
 # pages in their canonical locations). Concepts flat-filed per base seed.
 filing_rules:

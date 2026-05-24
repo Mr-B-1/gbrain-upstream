@@ -111,7 +111,7 @@ investment in Anthropic" can land in BOTH `deal_success` AND
 
 ## What this enables for the user
 
-- **Atoms + concepts ship in the binary.** Wintermute's parallel
+- **Atoms + concepts ship in the binary.** Your OpenClaw's parallel
   atom-pipeline-coordinator + atom-backfill-coordinator + concept-
   synthesis crons can retire (T12 follow-up). One `gbrain dream` cron
   covers everything.
@@ -121,8 +121,8 @@ investment in Anthropic" can land in BOTH `deal_success` AND
 - **Multi-lens calibration.** Activate gbrain-everything and see how
   often you're wrong on deals AND market calls AND architecture
   AND effort estimates in one `gbrain calibration --json` call.
-- **Lossless wintermute migration.** The `wintermute-greenfield`
-  importer (T7, mode='migration') re-ingests existing wintermute
+- **Lossless OpenClaw migration.** The `markdown-greenfield`
+  importer (T7, mode='migration') re-ingests existing OpenClaw
   pages with permanent slug-keyed idempotency + per-row JSONL audit
   + the `imported_from` marker so extract_atoms + synthesize_concepts
   don't re-extract already-atomized material.
@@ -139,5 +139,5 @@ investment in Anthropic" can land in BOTH `deal_success` AND
 - Voice gate integration for T1 Canon narratives.
 - op_checkpoint resumability for cross-cycle continuation in both
   phases.
-- Parity-baseline eval gates against wintermute's existing 13K atoms
+- Parity-baseline eval gates against your OpenClaw's existing 13K atoms
   + 11K concepts on a 500-page sample subset.

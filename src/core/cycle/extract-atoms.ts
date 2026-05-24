@@ -18,7 +18,7 @@
 //   4. Update op_checkpoint with the content_hash.
 //
 // Imports (D7): if the transcript's source page is itself marked
-// imported_from='wintermute-greenfield', skip. Wintermute already
+// imported_from='markdown-greenfield', skip. Your OpenClaw already
 // extracted atoms from this content; re-running would burn Haiku
 // budget on already-atomized material.
 //

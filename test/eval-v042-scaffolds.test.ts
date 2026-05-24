@@ -8,7 +8,7 @@
 import { describe, test, expect } from 'bun:test';
 import { runEvalExtractAtoms } from '../src/commands/eval-extract-atoms.ts';
 import { runEvalSynthesizeConcepts } from '../src/commands/eval-synthesize-concepts.ts';
-import { runEvalWintermuteGreenfield } from '../src/commands/eval-wintermute-greenfield.ts';
+import { runEvalMarkdownGreenfield } from '../src/commands/eval-markdown-greenfield.ts';
 
 describe('v0.41 T11: eval command surfaces', () => {
   test('runEvalExtractAtoms returns stable schema_version=1 envelope', async () => {
@@ -43,14 +43,14 @@ describe('v0.41 T11: eval command surfaces', () => {
     expect(result.details.sample_size).toBe(500);
   });
 
-  test('runEvalWintermuteGreenfield returns stable schema_version=1 envelope', async () => {
-    const result = await runEvalWintermuteGreenfield({});
+  test('runEvalMarkdownGreenfield returns stable schema_version=1 envelope', async () => {
+    const result = await runEvalMarkdownGreenfield({});
     expect(result.schema_version).toBe(1);
     expect(result.status).toBe('not_yet_implemented');
   });
 
-  test('runEvalWintermuteGreenfield preserves --pass-rate-floor', async () => {
-    const result = await runEvalWintermuteGreenfield({
+  test('runEvalMarkdownGreenfield preserves --pass-rate-floor', async () => {
+    const result = await runEvalMarkdownGreenfield({
       passRateFloor: 0.95,
       repoPath: '~/git/brain',
     });
@@ -61,7 +61,7 @@ describe('v0.41 T11: eval command surfaces', () => {
   test('all 3 commands include v0_41_1_followup pointer in details', async () => {
     const r1 = await runEvalExtractAtoms({});
     const r2 = await runEvalSynthesizeConcepts({});
-    const r3 = await runEvalWintermuteGreenfield({});
+    const r3 = await runEvalMarkdownGreenfield({});
     expect(r1.details.v0_41_1_followup).toBeDefined();
     expect(r2.details.v0_41_1_followup).toBeDefined();
     expect(r3.details.v0_41_1_followup).toBeDefined();

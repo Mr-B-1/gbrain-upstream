@@ -1,11 +1,11 @@
-// v0.41 T7 — WintermuteGreenfieldSource one-shot migration importer.
+// v0.41 T7 — MarkdownGreenfieldSource one-shot migration importer.
 //
 // Tests the source's bulk-import pipeline against fake-fs fixtures:
 // directory walk, frontmatter parse, imported_from marker stamping,
 // per-row validation failure → JSONL audit, dry-run mode, limit honored.
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { WintermuteGreenfieldSource } from '../../src/core/ingestion/sources/wintermute-greenfield.ts';
+import { MarkdownGreenfieldSource } from '../../src/core/ingestion/sources/markdown-greenfield.ts';
 import type { IngestionEvent, IngestionSourceContext } from '../../src/core/ingestion/types.ts';
 
 interface FakeFs {
@@ -79,20 +79,20 @@ function makeCtx(): IngestionSourceContext & { emitted: IngestionEvent[]; warnin
 
 const REPO = '/fake/brain';
 
-describe('v0.41 T7: WintermuteGreenfieldSource basic contract', () => {
+describe('v0.41 T7: MarkdownGreenfieldSource basic contract', () => {
   test('declares mode: migration (bypasses 24h dedup window)', () => {
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO });
     expect(src.mode).toBe('migration');
   });
 
-  test('kind is wintermute-greenfield', () => {
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO });
-    expect(src.kind).toBe('wintermute-greenfield');
+  test('kind is markdown-greenfield', () => {
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO });
+    expect(src.kind).toBe('markdown-greenfield');
   });
 
   test('start() throws when repo path does not exist', async () => {
     const fs = makeFakeFs({});
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       ...fsOpts(fs),
     });
@@ -116,7 +116,7 @@ describe('v0.41 T7: walk + emit basic flow', () => {
       [`${REPO}/concepts/concept-1.md`]: '---\ntype: concept\ntier: T1\n---\nconcept-body',
       [`${REPO}/ideas/idea-1.md`]: '---\ntype: idea\n---\nidea-body',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       ...fsOpts(fs),
     });
@@ -133,11 +133,11 @@ describe('v0.41 T7: walk + emit basic flow', () => {
     const fs = makeFakeFs({
       [`${REPO}/atoms/2026-05-24/atom.md`]: '---\ntype: atom\nvirality_score: 80\n---\noriginal body',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     const event = ctx.emitted[0];
-    expect(event.content).toContain('imported_from: wintermute-greenfield');
+    expect(event.content).toContain('imported_from: markdown-greenfield');
     expect(event.content).toContain('imported_at:');
     expect(event.content).toContain('virality_score: 80'); // preserved
     expect(event.content).toContain('original body'); // preserved
@@ -147,12 +147,12 @@ describe('v0.41 T7: walk + emit basic flow', () => {
     const fs = makeFakeFs({
       [`${REPO}/atoms/2026-05-24/x.md`]: '---\ntype: atom\n---\nbody',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     const event = ctx.emitted[0];
-    expect(event.source_kind).toBe('wintermute-greenfield');
-    expect(event.source_id).toMatch(/^wintermute-greenfield:\d+$/);
+    expect(event.source_kind).toBe('markdown-greenfield');
+    expect(event.source_id).toMatch(/^markdown-greenfield:\d+$/);
     expect(event.source_uri).toBe(`file://${REPO}/atoms/2026-05-24/x.md`);
     expect(event.content_type).toBe('text/markdown');
     expect(event.untrusted_payload).toBe(false);
@@ -163,14 +163,14 @@ describe('v0.41 T7: walk + emit basic flow', () => {
       [`${REPO}/atoms/2026-05-24/sample-atom.md`]:
         '---\ntype: atom\nsource_slug: meetings/2026-04-21\nvirality_score: 79\n---\nthe atom',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     const meta = ctx.emitted[0].metadata!;
     expect(meta.slug).toBe('atoms/2026-05-24/sample-atom');
     expect(meta.page_type).toBe('atom');
     expect(meta.original_path).toBe('atoms/2026-05-24/sample-atom.md');
-    expect(meta.importer).toBe('wintermute-greenfield');
+    expect(meta.importer).toBe('markdown-greenfield');
     expect(meta.importer_version).toBe('0.41.0');
     const orig = meta.original_frontmatter as Record<string, unknown>;
     expect(orig.type).toBe('atom');
@@ -184,7 +184,7 @@ describe('v0.41 T7: validation failure → JSONL audit', () => {
     const fs = makeFakeFs({
       [`${REPO}/atoms/2026-05-24/no-type.md`]: '---\nsource_slug: meetings/x\n---\nno type field',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     expect(src.stats.emitted).toBe(0);
@@ -203,7 +203,7 @@ describe('v0.41 T7: validation failure → JSONL audit', () => {
       [`${REPO}/atoms/2026-05-24/a.md`]: '---\ntype: atom\n---\na',
       [`${REPO}/atoms/2026-05-24/b.md`]: '---\ntype: atom\n---\nb',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     expect(src.stats.emitted).toBe(2);
@@ -215,7 +215,7 @@ describe('v0.41 T7: validation failure → JSONL audit', () => {
     const fs = makeFakeFs({
       [`${REPO}/atoms/2026-05-24/empty.md`]: '',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       auditDir: '/fake/audit',
       ...fsOpts(fs),
@@ -234,7 +234,7 @@ describe('v0.41 T7: --dry-run mode', () => {
       [`${REPO}/atoms/2026-05-24/y.md`]: '---\ntype: atom\n---\nbody',
       [`${REPO}/concepts/c.md`]: '---\ntype: concept\n---\nbody',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       dryRun: true,
       ...fsOpts(fs),
@@ -254,7 +254,7 @@ describe('v0.41 T7: --limit honored', () => {
       [`${REPO}/atoms/2026-05-24/c.md`]: '---\ntype: atom\n---\nc',
       [`${REPO}/atoms/2026-05-24/d.md`]: '---\ntype: atom\n---\nd',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       limit: 2,
       ...fsOpts(fs),
@@ -271,7 +271,7 @@ describe('v0.41 T7: --limit honored', () => {
       [`${REPO}/atoms/2026-05-24/b.md`]: '---\ntype: atom\n---\nb',
       [`${REPO}/atoms/2026-05-24/c.md`]: '---\ntype: atom\n---\nc',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       limit: 2,
       dryRun: true,
@@ -292,7 +292,7 @@ describe('v0.41 T7: deterministic file ordering', () => {
       [`${REPO}/atoms/2026-05-24/alpha.md`]: '---\ntype: atom\n---\na',
       [`${REPO}/atoms/2026-05-24/middle.md`]: '---\ntype: atom\n---\nm',
     });
-    const src = new WintermuteGreenfieldSource({
+    const src = new MarkdownGreenfieldSource({
       repoPath: REPO,
       limit: 1,
       ...fsOpts(fs),
@@ -310,7 +310,7 @@ describe('v0.41 T7: healthCheck()', () => {
     const fs = makeFakeFs({
       [`${REPO}/atoms/2026-05-24/x.md`]: '---\ntype: atom\n---\nbody',
     });
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const ctx = makeCtx();
     await src.start(ctx);
     const health = await src.healthCheck();
@@ -320,7 +320,7 @@ describe('v0.41 T7: healthCheck()', () => {
 
   test('returns warn before start', async () => {
     const fs = makeFakeFs({});
-    const src = new WintermuteGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
+    const src = new MarkdownGreenfieldSource({ repoPath: REPO, ...fsOpts(fs) });
     const health = await src.healthCheck();
     expect(health.status).toBe('warn');
   });

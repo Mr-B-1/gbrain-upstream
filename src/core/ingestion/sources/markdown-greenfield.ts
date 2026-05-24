@@ -1,6 +1,6 @@
 /**
- * WintermuteGreenfieldSource — one-shot bulk importer for the v0.41
- * wintermute → gbrain epistemology migration.
+ * MarkdownGreenfieldSource — one-shot bulk importer for the v0.41
+ * your OpenClaw → gbrain epistemology migration.
  *
  * @one-shot — this module is intentionally long-lived after the
  * single production migration completes. Per D10, future similar
@@ -13,7 +13,7 @@
  * trickle dedup window. mode: 'migration' on this source signals the
  * daemon's handleEmit branch to bypass DedupWindow.mark(); we own dedup
  * via the imported_from frontmatter marker + op_checkpoint (which the
- * caller wires via gbrain capture --source wintermute-greenfield).
+ * caller wires via gbrain capture --source markdown-greenfield).
  *
  * Walk:
  *   - ~/git/brain/atoms/{YYYY-MM-DD}/*.md (~13K files, atoms)
@@ -23,7 +23,7 @@
  * Per file:
  *   1. Read content, split frontmatter via gray-matter
  *   2. Validate the frontmatter has required `type:` (atom/concept/idea/etc)
- *   3. Stamp imported_from='wintermute-greenfield' in frontmatter
+ *   3. Stamp imported_from='markdown-greenfield' in frontmatter
  *      (downstream extract_atoms + synthesize_concepts phases skip on
  *      this marker per D7 — lossless import with provenance, no
  *      re-extraction)
@@ -32,11 +32,11 @@
  *   5. Emit IngestionEvent
  *
  * Per-row validation failure:
- *   - Append a JSONL line to ~/.gbrain/audit/wintermute-greenfield-failures-
+ *   - Append a JSONL line to ~/.gbrain/audit/markdown-greenfield-failures-
  *     YYYY-Www.jsonl with {path, error, ts} per D12
  *   - Continue with remaining files (don't fail-fast on one bad row)
  *
- * CLI activation: gbrain capture --source wintermute-greenfield
+ * CLI activation: gbrain capture --source markdown-greenfield
  *   --repo ~/git/brain [--dry-run] [--limit N]
  *
  * The --repo path is the brain directory containing atoms/, concepts/,
@@ -56,7 +56,7 @@ import type {
   IngestionSourceHealth,
 } from '../types.ts';
 
-export interface WintermuteGreenfieldOpts {
+export interface MarkdownGreenfieldOpts {
   /** Brain repo root (default: ~/git/brain). */
   repoPath?: string;
   /** Dry-run: walk + validate but don't emit. */
@@ -82,33 +82,33 @@ interface WalkResult {
   scanned: number;
 }
 
-export interface WintermuteGreenfieldStats {
+export interface MarkdownGreenfieldStats {
   emitted: number;
   skipped_invalid: number;
   skipped_no_type: number;
   total_walked: number;
 }
 
-export class WintermuteGreenfieldSource implements IngestionSource {
+export class MarkdownGreenfieldSource implements IngestionSource {
   readonly id: string;
-  readonly kind = 'wintermute-greenfield';
+  readonly kind = 'markdown-greenfield';
   readonly mode: IngestionSourceMode = 'migration';
 
-  private readonly opts: Required<Omit<WintermuteGreenfieldOpts, 'repoPath' | 'auditDir' | 'limit'>> & {
+  private readonly opts: Required<Omit<MarkdownGreenfieldOpts, 'repoPath' | 'auditDir' | 'limit'>> & {
     repoPath: string;
     auditDir: string;
     limit: number | undefined;
   };
   private ctx: IngestionSourceContext | null = null;
-  private _stats: WintermuteGreenfieldStats = {
+  private _stats: MarkdownGreenfieldStats = {
     emitted: 0,
     skipped_invalid: 0,
     skipped_no_type: 0,
     total_walked: 0,
   };
 
-  constructor(opts: WintermuteGreenfieldOpts = {}) {
-    this.id = `wintermute-greenfield:${process.pid}`;
+  constructor(opts: MarkdownGreenfieldOpts = {}) {
+    this.id = `markdown-greenfield:${process.pid}`;
     this.opts = {
       repoPath: opts.repoPath ?? join(homedir(), 'git', 'brain'),
       dryRun: opts.dryRun ?? false,
@@ -133,12 +133,12 @@ export class WintermuteGreenfieldSource implements IngestionSource {
     this.ctx = ctx;
     if (!this.opts._existsSync(this.opts.repoPath)) {
       throw new Error(
-        `WintermuteGreenfieldSource: repo path does not exist: ${this.opts.repoPath}`,
+        `MarkdownGreenfieldSource: repo path does not exist: ${this.opts.repoPath}`,
       );
     }
     const walk = this.walkFiles();
     ctx.logger.info(
-      `[wintermute-greenfield] discovered ${walk.files.length} files under ${this.opts.repoPath}`,
+      `[markdown-greenfield] discovered ${walk.files.length} files under ${this.opts.repoPath}`,
     );
 
     let processed = 0;
@@ -161,13 +161,13 @@ export class WintermuteGreenfieldSource implements IngestionSource {
       } catch (err) {
         this._stats.skipped_invalid++;
         const errMsg = err instanceof Error ? err.message : String(err);
-        ctx.logger.warn(`[wintermute-greenfield] skipped ${path}: ${errMsg}`);
+        ctx.logger.warn(`[markdown-greenfield] skipped ${path}: ${errMsg}`);
         this.appendFailureAudit(path, errMsg);
       }
     }
 
     ctx.logger.info(
-      `[wintermute-greenfield] done: ${this._stats.emitted} emitted, ` +
+      `[markdown-greenfield] done: ${this._stats.emitted} emitted, ` +
         `${this._stats.skipped_invalid} invalid, ${this._stats.skipped_no_type} no-type, ` +
         `${this._stats.total_walked} total`,
     );
@@ -192,7 +192,7 @@ export class WintermuteGreenfieldSource implements IngestionSource {
   }
 
   /** Diagnostic: import counters since start. */
-  get stats(): WintermuteGreenfieldStats {
+  get stats(): MarkdownGreenfieldStats {
     return { ...this._stats };
   }
 
@@ -262,7 +262,7 @@ export class WintermuteGreenfieldSource implements IngestionSource {
     // put_page handler can reconstruct fidelity.
     const importedFm = {
       ...fm,
-      imported_from: 'wintermute-greenfield',
+      imported_from: 'markdown-greenfield',
       imported_at: new Date().toISOString(),
     };
 
@@ -277,14 +277,14 @@ export class WintermuteGreenfieldSource implements IngestionSource {
       content_type: 'text/markdown',
       content: newBody,
       content_hash: computeContentHash(newBody),
-      // local file, user's own wintermute brain — trusted payload
+      // local file, user's own your OpenClaw brain — trusted payload
       untrusted_payload: false,
       metadata: {
         slug,
         page_type: fm.type as string,
         original_path: relative(this.opts.repoPath, path),
         original_frontmatter: fm,
-        importer: 'wintermute-greenfield',
+        importer: 'markdown-greenfield',
         importer_version: '0.41.0',
       },
     };
@@ -302,12 +302,12 @@ export class WintermuteGreenfieldSource implements IngestionSource {
 
   private appendFailureAudit(path: string, errMsg: string): void {
     const week = this.isoWeekString(new Date());
-    const auditPath = join(this.opts.auditDir, `wintermute-greenfield-failures-${week}.jsonl`);
+    const auditPath = join(this.opts.auditDir, `markdown-greenfield-failures-${week}.jsonl`);
     const line = JSON.stringify({
       ts: new Date().toISOString(),
       path,
       error: errMsg,
-      importer: 'wintermute-greenfield',
+      importer: 'markdown-greenfield',
     });
     try {
       this.opts._appendFileSync(auditPath, line + '\n');
@@ -315,7 +315,7 @@ export class WintermuteGreenfieldSource implements IngestionSource {
       // Audit write failure is non-fatal; log to ctx if available.
       if (this.ctx) {
         this.ctx.logger.warn(
-          `[wintermute-greenfield] audit write failed: ${err instanceof Error ? err.message : String(err)}`,
+          `[markdown-greenfield] audit write failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }

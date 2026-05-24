@@ -2,17 +2,17 @@
 
 All notable changes to GBrain will be documented in this file.
 
-## [0.41.0.0] - 2026-05-24
+## [0.42.0.0] - 2026-05-24
 
-**Your brain can now hold three lenses on the same data at once: creator, investor, engineer.** If you write content AND evaluate deals AND ship code, your old setup probably had three different agents pulling from three different mental models. This release ships four bundled "schema packs" that turn one brain into a multi-lens substrate: atoms + concepts join facts + takes as first-class units; gstack's typed learnings flow into the brain as first-class pages; the calibration profile that tracks how often you're wrong widens past its `{}` placeholder to score multiple domains side by side; and a one-shot migration importer lifts wintermute's 13K atoms + 11K concepts into gbrain with permanent slug-keyed idempotency. Activate `gbrain-everything` and the dream cycle runs every pack-declared phase, the calibration profile produces all 7 domain scorecards in one query, and your gstack engineering learnings start appearing as queryable brain pages within seconds of being written.
+**Your brain can now hold three lenses on the same data at once: creator, investor, engineer.** If you write content AND evaluate deals AND ship code, your old setup probably had three different agents pulling from three different mental models. This release ships four bundled "schema packs" that turn one brain into a multi-lens substrate: atoms + concepts join facts + takes as first-class units; gstack's typed learnings flow into the brain as first-class pages; the calibration profile that tracks how often you're wrong widens past its `{}` placeholder to score multiple domains side by side; and a one-shot migration importer lifts your OpenClaw's 13K atoms + 11K concepts into gbrain with permanent slug-keyed idempotency. Activate `gbrain-everything` and the dream cycle runs every pack-declared phase, the calibration profile produces all 7 domain scorecards in one query, and your gstack engineering learnings start appearing as queryable brain pages within seconds of being written.
 
 The lens packs are gbrain-creator (atoms + concepts), gbrain-investor (deal/thesis/bet_resolution_log + investor calibration domains), gbrain-engineer (a `learning` bridge for the gstack JSONL system), and gbrain-everything (a meta-pack that stacks all three via the v0.38 extends+borrow chain — no new active-multi-pack architecture needed, the registry walks the chain). Each pack declares the cycle phases it activates via a new `phases:` manifest field; the runCycle orchestrator gates pack-flavored phases on the active pack's declaration so a brain on gbrain-base stays unchanged byte-for-byte. The pre-existing 17 core phases (lint, sync, extract, extract_facts, propose_takes, grade_takes, calibration_profile, etc.) always run regardless of pack — `phases:` is additive, not subtractive.
 
-The codex outside-voice review caught four cross-model tensions during the eng review that reshaped the design: take→domain attribution moved from a scalar takes.domain column to a take_domain_assignments JOIN table (multi-domain takes attribute honestly to every applicable bucket); the wintermute greenfield importer moved from trickle-mode IngestionSource to a new `mode: 'migration'` discriminator (permanent slug-keyed idempotency for bulk historical replay where retries happen days apart, not 24h windowed dedup); calibration domain shapes split into open names + closed aggregator algorithms (third-party packs can add domain labels without a gbrain release); and the meta-pack uses extends+borrow instead of a new multi-active-pack concept.
+The codex outside-voice review caught four cross-model tensions during the eng review that reshaped the design: take→domain attribution moved from a scalar takes.domain column to a take_domain_assignments JOIN table (multi-domain takes attribute honestly to every applicable bucket); the markdown greenfield importer moved from trickle-mode IngestionSource to a new `mode: 'migration'` discriminator (permanent slug-keyed idempotency for bulk historical replay where retries happen days apart, not 24h windowed dedup); calibration domain shapes split into open names + closed aggregator algorithms (third-party packs can add domain labels without a gbrain release); and the meta-pack uses extends+borrow instead of a new multi-active-pack concept.
 
 The calibration profile aggregator (T10) ships four algorithms: scalar_brier (the default for probabilistic predictions), weighted_brier (Brier weighted by conviction so high-stakes misses cost more), count_based (accuracy without Brier), and cluster_summary (descriptive rollup with tier histogram for domains like concept_themes that have no binary outcome to score against).
 
-## To take advantage of v0.41.0.0
+## To take advantage of v0.42.0.0
 
 `gbrain upgrade` handles the schema migration. After upgrade:
 
@@ -35,14 +35,14 @@ gbrain calibration --json | jq '.domain_scorecards | keys'
 # ["_overall", "deal_success", "founder_evaluation", "market_call",
 #  "concept_themes", "architecture_calls", "effort_estimates", "risk_assessment"]
 
-# 5. (Optional, wintermute users only) Migrate your existing brain:
-gbrain capture --source wintermute-greenfield --repo ~/git/brain --dry-run --limit 100
-# Inspect ~/.gbrain/audit/wintermute-greenfield-failures-YYYY-Www.jsonl
+# 5. (Optional, OpenClaw users only) Migrate your existing brain:
+gbrain capture --source markdown-greenfield --repo ~/git/brain --dry-run --limit 100
+# Inspect ~/.gbrain/audit/markdown-greenfield-failures-YYYY-Www.jsonl
 # If clean, run for real (~30-60min for 24K pages):
-gbrain capture --source wintermute-greenfield --repo ~/git/brain
+gbrain capture --source markdown-greenfield --repo ~/git/brain
 ```
 
-After migrating, retire wintermute's parallel atom-pipeline-coordinator + atom-backfill-coordinator crons; gbrain's autopilot already runs extract_atoms + synthesize_concepts inside every dream cycle when a creator-flavored pack is active. See `docs/migrations/v0.41-wintermute-greenfield.md` for the full operator guide.
+After migrating, retire your OpenClaw's parallel atom-pipeline-coordinator + atom-backfill-coordinator crons; gbrain's autopilot already runs extract_atoms + synthesize_concepts inside every dream cycle when a creator-flavored pack is active. See `docs/migrations/v0.41-markdown-greenfield.md` for the full operator guide.
 
 ### Itemized changes
 
@@ -70,17 +70,17 @@ After migrating, retire wintermute's parallel atom-pipeline-coordinator + atom-b
 - `calibration_profiles.domain_scorecards` JSONB now populates per declared domain with `{n, brier, accuracy, aggregator, page_types, extras}` via the new `src/core/calibration/domain-aggregators.ts` module. R1 IRON RULE: byte-identical empty `{}` regression preserved when no active pack declares domains.
 
 **Two new IngestionSources:**
-- `wintermute-greenfield` (mode: 'migration') — one-shot bulk importer at `src/core/ingestion/sources/wintermute-greenfield.ts`. Walks `atoms/{YYYY-MM-DD}/`, `concepts/`, `ideas/`. Per-row validation failure → JSONL audit at `~/.gbrain/audit/wintermute-greenfield-failures-YYYY-Www.jsonl`. Long-lived (`@one-shot` doc comment per D10).
+- `markdown-greenfield` (mode: 'migration') — one-shot bulk importer at `src/core/ingestion/sources/markdown-greenfield.ts`. Walks `atoms/{YYYY-MM-DD}/`, `concepts/`, `ideas/`. Per-row validation failure → JSONL audit at `~/.gbrain/audit/markdown-greenfield-failures-YYYY-Www.jsonl`. Long-lived (`@one-shot` doc comment per D10).
 - `gstack-learnings` (mode: 'trickle') — daemon-side bridge at `src/core/ingestion/sources/gstack-learnings.ts`. Watches `~/.gstack/projects/{repo}/learnings.jsonl`, emits each line as a `learning`-typed IngestionEvent. Activates when engineer or gbrain-everything pack is active.
 
 **Three eval commands (scaffolds):**
-- `gbrain eval extract-atoms`, `gbrain eval synthesize-concepts`, `gbrain eval wintermute-greenfield` — command surfaces ship; parity-baseline implementations against wintermute's existing 13K atoms + 11K concepts on a 500-page sample subset land in v0.41.1.
+- `gbrain eval extract-atoms`, `gbrain eval synthesize-concepts`, `gbrain eval markdown-greenfield` — command surfaces ship; parity-baseline implementations against your OpenClaw's existing 13K atoms + 11K concepts on a 500-page sample subset land in v0.41.1.
 
 **Tests:** 16 new test files, 199 cases pinning the v0.41 contracts (R-MIG migration regression, R-GATE orchestrator pack gate, manifest schema shape, lens pack declarations, calibration aggregator math, ingestion mode discriminator, source emit pipelines).
 
 **Documentation:**
 - `docs/architecture/lens-packs.md` — full lens pack architecture, four-pack diagram, calibration widening explainer, v0.41.1 follow-ups.
-- `docs/migrations/v0.41-wintermute-greenfield.md` — operator guide for the bulk migration: dry-run, audit JSONL inspection, retiring wintermute's parallel crons.
+- `docs/migrations/v0.41-markdown-greenfield.md` — operator guide for the bulk migration: dry-run, audit JSONL inspection, retiring your OpenClaw's parallel crons.
 
 ### v0.41.1 follow-ups (filed)
 
@@ -89,8 +89,8 @@ After migrating, retire wintermute's parallel atom-pipeline-coordinator + atom-b
 - Embedding-similarity dedup for synthesize_concepts (currently exact-string concept ref match only).
 - Voice gate integration for T1 Canon narratives in synthesize_concepts.
 - op_checkpoint resumability for cross-cycle continuation in both new phases.
-- Parity-baseline eval gates against wintermute outputs on 500-page sample.
-- Wintermute-side cleanup (`atom-pipeline-coordinator` retire + SKILL.md shrinks) lives in `~/git/wintermute`, not this repo.
+- Parity-baseline eval gates against your OpenClaw outputs on 500-page sample.
+- OpenClaw-side cleanup (`atom-pipeline-coordinator` retire + SKILL.md shrinks) lives in `~/git/your-openclaw`, not this repo.
 
 ## [0.40.8.1] - 2026-05-23
 
