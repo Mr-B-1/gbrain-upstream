@@ -30,6 +30,19 @@ let repoDir: string;
 
 beforeAll(() => {
   tmpHome = mkdtempSync(join(tmpdir(), 'gbrain-preflight-e2e-'));
+  // gbrainPath() appends `.gbrain` to GBRAIN_HOME — pre-create the dir.
+  const gbrainDir = join(tmpHome, '.gbrain');
+  mkdirSync(gbrainDir, { recursive: true });
+  // Pre-populate config.json so we can exercise the preflight without
+  // running `gbrain init` (which refuses when multiple provider env keys
+  // are already in the parent shell — out of scope for this test).
+  // GBRAIN_HOME is hermetic; this config is private to this test run.
+  writeFileSync(join(gbrainDir, 'config.json'), JSON.stringify({
+    database: 'pglite',
+    pglite_dir: join(gbrainDir, 'pglite'),
+    embedding_model: 'openai:text-embedding-3-small',
+    embedding_dimensions: 1536,
+  }, null, 2));
 });
 
 afterAll(() => {
@@ -37,7 +50,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  // Create a fresh PGLite-backed brain repo with one markdown file.
+  // Create a fresh repo with one markdown file.
   if (repoDir) { try { rmSync(repoDir, { recursive: true, force: true }); } catch { /* */ } }
   repoDir = mkdtempSync(join(tmpdir(), 'gbrain-preflight-repo-'));
   mkdirSync(join(repoDir, 'people'), { recursive: true });
@@ -59,6 +72,12 @@ beforeEach(() => {
 
 function runCli(args: string[], env: Record<string, string | undefined>): { code: number; stdout: string; stderr: string } {
   const fullEnv: Record<string, string | undefined> = { ...(process.env as Record<string, string | undefined>), GBRAIN_HOME: tmpHome, ...env };
+  // Strip ALL provider keys by default — the preflight test is about
+  // the OPENAI path; other keys would route preflight elsewhere and
+  // muddy the test signal.
+  for (const k of ['OPENAI_API_KEY', 'VOYAGE_API_KEY', 'ZEROENTROPY_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'ANTHROPIC_API_KEY']) {
+    if (!(k in env)) delete fullEnv[k];
+  }
   // Strip any undefined-explicitly-set vars (signals "unset").
   for (const k of Object.keys(fullEnv)) if (fullEnv[k] === undefined) delete fullEnv[k];
   const res = spawnSync(CLI[0], [...CLI.slice(1), ...args], {
@@ -71,37 +90,22 @@ function runCli(args: string[], env: Record<string, string | undefined>): { code
 
 describe('v0.41.6.0 D1 E2E — gbrain sync preflight rejects missing OPENAI_API_KEY', () => {
   test('exits non-zero with paste-ready stderr message', () => {
-    // Initialize a PGLite brain pointing at the test repo.
-    const initResult = runCli(
-      ['init', '--pglite', '--repo', repoDir, '--yes'],
-      { OPENAI_API_KEY: undefined },
-    );
-    // init succeeds even without OPENAI_API_KEY (it defers embedding setup).
-    expect(initResult.code === 0 || initResult.code === 2).toBe(true);
+    const result = runCli(['sync', '--repo', repoDir, '--full', '--yes'], {});
 
-    const result = runCli(
-      ['sync', '--repo', repoDir, '--full', '--yes'],
-      { OPENAI_API_KEY: undefined },
-    );
-
-    // Exit non-zero (either 1 from preflight or 2 from deferred-embed gate).
     expect(result.code).not.toBe(0);
 
-    // Stderr OR stdout contains the credential-error message (the preflight
-    // writes to stderr but the deferred-embed gate may write to stderr too).
+    // The preflight error message contains the exact phrase from
+    // src/core/embed-preflight.ts — pinpoint test, not regex-loose.
     const combined = result.stderr + result.stdout;
-    const hasCredentialMessage =
-      /OPENAI_API_KEY/i.test(combined) ||
-      /requires OPENAI_API_KEY/i.test(combined) ||
-      /embedding (model|setup|deferred)/i.test(combined);
-    expect(hasCredentialMessage).toBe(true);
+    expect(combined).toMatch(/OPENAI_API_KEY/);
+    expect(combined).toMatch(/requires OPENAI_API_KEY/);
+    expect(combined).toMatch(/--no-embed/);
   });
 
   test('does NOT write 565 identical entries to sync-failures.jsonl', () => {
-    runCli(['init', '--pglite', '--repo', repoDir, '--yes'], { OPENAI_API_KEY: undefined });
-    runCli(['sync', '--repo', repoDir, '--full', '--yes'], { OPENAI_API_KEY: undefined });
+    runCli(['sync', '--repo', repoDir, '--full', '--yes'], {});
 
-    const failuresPath = join(tmpHome, 'sync-failures.jsonl');
+    const failuresPath = join(tmpHome, '.gbrain', 'sync-failures.jsonl');
     if (!existsSync(failuresPath)) {
       // File never created — perfect outcome.
       expect(true).toBe(true);
@@ -114,15 +118,10 @@ describe('v0.41.6.0 D1 E2E — gbrain sync preflight rejects missing OPENAI_API_
   });
 
   test('--no-embed bypasses the preflight (sync proceeds)', () => {
-    runCli(['init', '--pglite', '--repo', repoDir, '--yes'], { OPENAI_API_KEY: undefined });
-    const result = runCli(
-      ['sync', '--repo', repoDir, '--full', '--yes', '--no-embed'],
-      { OPENAI_API_KEY: undefined },
-    );
-    // --no-embed lets sync continue. Exit 0 (or 2 for cost prompt non-confirmation
-    // if --yes wasn't consumed by some path); 1 would mean we still rejected.
-    // The key contract: preflight DID NOT block this path.
+    const result = runCli(['sync', '--repo', repoDir, '--full', '--yes', '--no-embed'], {});
     const combined = result.stderr + result.stdout;
-    expect(combined).not.toMatch(/Embedding model.*requires.*OPENAI_API_KEY.*\n.*Set it in your shell/);
+    // The preflight DID NOT fire — no "requires OPENAI_API_KEY ... Set it in your shell"
+    // paragraph in the output.
+    expect(combined).not.toMatch(/requires OPENAI_API_KEY[\s\S]+Set it in your shell/);
   });
 });

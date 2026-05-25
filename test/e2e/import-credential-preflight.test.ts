@@ -18,6 +18,14 @@ let repoDir: string;
 
 beforeAll(() => {
   tmpHome = mkdtempSync(join(tmpdir(), 'gbrain-import-preflight-e2e-'));
+  const gbrainDir = join(tmpHome, '.gbrain');
+  mkdirSync(gbrainDir, { recursive: true });
+  writeFileSync(join(gbrainDir, 'config.json'), JSON.stringify({
+    database: 'pglite',
+    pglite_dir: join(gbrainDir, 'pglite'),
+    embedding_model: 'openai:text-embedding-3-small',
+    embedding_dimensions: 1536,
+  }, null, 2));
 });
 
 afterAll(() => {
@@ -36,6 +44,9 @@ beforeEach(() => {
 
 function runCli(args: string[], env: Record<string, string | undefined>): { code: number; stdout: string; stderr: string } {
   const fullEnv: Record<string, string | undefined> = { ...(process.env as Record<string, string | undefined>), GBRAIN_HOME: tmpHome, ...env };
+  for (const k of ['OPENAI_API_KEY', 'VOYAGE_API_KEY', 'ZEROENTROPY_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'ANTHROPIC_API_KEY']) {
+    if (!(k in env)) delete fullEnv[k];
+  }
   for (const k of Object.keys(fullEnv)) if (fullEnv[k] === undefined) delete fullEnv[k];
   const res = spawnSync(CLI[0], [...CLI.slice(1), ...args], {
     env: fullEnv as Record<string, string>,
@@ -47,22 +58,17 @@ function runCli(args: string[], env: Record<string, string | undefined>): { code
 
 describe('v0.41.6.0 D1 E2E — gbrain import preflight rejects missing OPENAI_API_KEY', () => {
   test('exits non-zero with paste-ready stderr message', () => {
-    runCli(['init', '--pglite', '--repo', repoDir, '--yes'], { OPENAI_API_KEY: undefined });
-    const result = runCli(['import', repoDir], { OPENAI_API_KEY: undefined });
-
+    const result = runCli(['import', repoDir], {});
     expect(result.code).not.toBe(0);
     const combined = result.stderr + result.stdout;
-    const hasCredentialMessage =
-      /OPENAI_API_KEY/i.test(combined) ||
-      /requires OPENAI_API_KEY/i.test(combined) ||
-      /embedding (model|setup|deferred)/i.test(combined);
-    expect(hasCredentialMessage).toBe(true);
+    expect(combined).toMatch(/OPENAI_API_KEY/);
+    expect(combined).toMatch(/requires OPENAI_API_KEY/);
+    expect(combined).toMatch(/--no-embed/);
   });
 
   test('--no-embed bypasses the preflight', () => {
-    runCli(['init', '--pglite', '--repo', repoDir, '--yes'], { OPENAI_API_KEY: undefined });
-    const result = runCli(['import', repoDir, '--no-embed'], { OPENAI_API_KEY: undefined });
+    const result = runCli(['import', repoDir, '--no-embed'], {});
     const combined = result.stderr + result.stdout;
-    expect(combined).not.toMatch(/Embedding model.*requires.*OPENAI_API_KEY.*\n.*Set it in your shell/);
+    expect(combined).not.toMatch(/requires OPENAI_API_KEY[\s\S]+Set it in your shell/);
   });
 });
