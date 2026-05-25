@@ -191,15 +191,15 @@ export function createAuditWriter<T extends { ts: string }>(
     // for consumers (parsers don't preserve it), this is fine.
     const row = { ...event, ts };
     const dir = resolveAuditDir();
-    // Route to the file matching the event's ts (not real-time-now) so
-    // a caller logging a backdated event (test fixtures, retroactive
-    // event capture, ISO-week boundary straddle) lands in the correct
-    // week file. When ts is invalid or unparseable, fall back to
-    // real-now — never throw. Production callers that don't pass ts
-    // get the same real-now behavior as before (the writer stamps ts
-    // above using new Date().toISOString()).
-    const tsForFile = Date.parse(ts);
-    const fileDate = Number.isFinite(tsForFile) ? new Date(tsForFile) : undefined;
+    // File path is derived from the event's ts (not wall-clock now) so
+    // back-dated events land in their own ISO week's file. Otherwise a
+    // test (or any caller) passing a historical ts would have its event
+    // routed to the current-week file, then readRecent — which walks
+    // current + previous week by `now` — would miss it. Fixes the CI
+    // flake where wall-clock week-of-test-run drifted past the test's
+    // synthetic now and emptied the readRecent window.
+    const eventDate = new Date(ts);
+    const fileDate = Number.isFinite(eventDate.getTime()) ? eventDate : new Date();
     const file = path.join(dir, computeFilename(fileDate));
     try {
       fs.mkdirSync(dir, { recursive: true });
