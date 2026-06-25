@@ -487,7 +487,7 @@ class GradeTakesPhase extends BaseCyclePhase {
     const judge = opts.judge ?? defaultJudge;
     const evidenceRetriever = opts.evidenceRetriever ?? hybridEvidenceRetriever;
     const promptVersion = opts.promptVersion ?? GRADE_TAKES_PROMPT_VERSION;
-    const minAgeMonths = opts.minAgeMonths ?? 6;
+    const minAgeMonths = opts.minAgeMonths ?? 0;
     const takeLimit = opts.takeLimit ?? 50;
     const autoResolve = opts.autoResolve ?? false; // D17 default OFF
     const autoResolveThreshold = opts.autoResolveThreshold ?? 0.95; // D12 conservative

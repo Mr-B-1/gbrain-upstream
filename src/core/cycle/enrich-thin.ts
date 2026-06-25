@@ -306,16 +306,16 @@ export async function runPhaseEnrichThin(
   const totals = { enriched: 0, skipped_insufficient: 0, sources_processed: 0, candidates_considered: 0 };
   for (const r of Object.values(perSourceResults)) {
     if (!r.error) totals.sources_processed++;
-    totals.candidates_considered = (totals.candidates_considered ?? 0) + r.candidates_considered;
-    totals.enriched += r.pages_enriched;
-    totals.skipped_insufficient += r.pages_skipped_insufficient;
+    totals.candidates_considered += r.candidates_considered ?? 0;
+    totals.enriched += r.pages_enriched ?? 0;
+    totals.skipped_insufficient += r.pages_skipped_insufficient ?? 0;
   }
 
   const anyError = Object.values(perSourceResults).some((r) => r.error);
   const anyBudgetFlag = Object.values(perSourceResults).some((r) => r.budget_exhausted === true);
   const outcome = classifyEnrichThinOutcome({
     sourcesCount: sources.length,
-    candidatesConsidered: totals.candidates_considered ?? 0,
+    candidatesConsidered: totals.candidates_considered,
     pagesEnriched: totals.enriched,
     pagesSkippedInsufficient: totals.skipped_insufficient,
     anyBudgetFlag,
@@ -344,7 +344,7 @@ export async function runPhaseEnrichThin(
       sources_processed: totals.sources_processed,
       result_status: outcome.result_status,
       budget_exhausted: outcome.budget_exhausted,
-      candidates_considered: totals.candidates_considered ?? 0,
+      candidates_considered: totals.candidates_considered,
       pages_enriched: totals.enriched,
       pages_skipped_insufficient: totals.skipped_insufficient,
       spent_usd: totalSpent,

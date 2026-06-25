@@ -1760,6 +1760,7 @@ const takes_propose_accept: Operation = {
   name: 'takes_propose_accept',
   description: 'Accept one reviewed take proposal, append it to the source markdown takes fence, mirror it to DB, and stamp the proposal accepted.',
   scope: 'write',
+  localOnly: true,
   params: {
     proposal_id: { type: 'number', required: true },
   },

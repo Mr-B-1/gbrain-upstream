@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { BrainEngine, TakeKind } from './engine.ts';
 import { parseTakesFence, upsertTakeRow } from './takes-fence.ts';
 import { withPageLock } from './page-lock.ts';
+import { validateSlug } from './utils.ts';
 
 export interface TakeProposalRow {
   id: number;
@@ -96,7 +97,7 @@ async function resolveBrainDir(engine: BrainEngine, explicitDir?: string): Promi
 }
 
 function pageFilePath(brainDir: string, slug: string): string {
-  return join(brainDir, `${slug}.md`);
+  return join(brainDir, `${validateSlug(slug)}.md`);
 }
 
 export async function listTakeProposals(
@@ -197,8 +198,13 @@ export async function acceptTakeProposal(
         const pageId = Number(row.page_id);
         await tx.executeRaw('SELECT pg_advisory_xact_lock($1::bigint)', [pageId]);
 
-        const dupes = await tx.executeRaw<{ row_num: number }>(
-          `SELECT row_num
+        originalBody = readFileSync(path, 'utf-8');
+        const proposalSource = `proposal:${proposalId}`;
+        const existingMarkdownRow = parseTakesFence(originalBody).takes.find((take) => take.source === proposalSource);
+        const sinceDate = dateOnlyOrUndefined(row.effective_date, row.effective_date_source);
+
+        const dupes = await tx.executeRaw<{ row_num: number; source?: string | null }>(
+          `SELECT row_num, source
            FROM takes
            WHERE page_id = $1 AND active = true
              AND lower(trim(claim)) = lower(trim($2))
@@ -206,23 +212,49 @@ export async function acceptTakeProposal(
           [pageId, row.claim_text],
         );
         if (dupes.length > 0) {
+          if (dupes[0].source === proposalSource) {
+            const stamped = await tx.executeRaw<{ promoted_row_num: number }>(
+              `UPDATE take_proposals
+               SET status = 'accepted',
+                   acted_at = now(),
+                   acted_by = $2,
+                   promoted_row_num = $3
+               WHERE id = $1 AND status = 'pending'
+               RETURNING promoted_row_num`,
+              [proposalId, actedBy, dupes[0].row_num],
+            );
+            if (stamped.length === 0) {
+              throw new Error(`take proposal ${proposalId} was not stamped accepted`);
+            }
+            return {
+              ok: true,
+              proposal_id: proposalId,
+              page_slug: String(row.page_slug),
+              row_num: dupes[0].row_num,
+              status: 'accepted',
+              idempotent: true,
+              since_date: sinceDate,
+            } satisfies TakeProposalAcceptResult;
+          }
           throw new Error(`take proposal ${proposalId} duplicates existing take row #${dupes[0].row_num}`);
         }
 
-        originalBody = readFileSync(path, 'utf-8');
-        const sinceDate = dateOnlyOrUndefined(row.effective_date, row.effective_date_source);
-        const { body: nextBody, rowNum } = upsertTakeRow(originalBody, {
-          claim: String(row.claim_text),
-          kind: String(row.kind),
-          holder: String(row.holder),
-          weight: Number(row.weight),
-          source: `proposal:${proposalId}`,
-          sinceDate,
-          active: true,
-        });
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, nextBody, 'utf-8');
-        wroteBody = true;
+        let rowNum = existingMarkdownRow?.rowNum;
+        if (rowNum === undefined) {
+          const next = upsertTakeRow(originalBody, {
+            claim: String(row.claim_text),
+            kind: String(row.kind),
+            holder: String(row.holder),
+            weight: Number(row.weight),
+            source: proposalSource,
+            sinceDate,
+            active: true,
+          });
+          rowNum = next.rowNum;
+          mkdirSync(dirname(path), { recursive: true });
+          writeFileSync(path, next.body, 'utf-8');
+          wroteBody = true;
+        }
 
         await tx.addTakesBatch([{
           page_id: pageId,

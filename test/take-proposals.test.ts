@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { operations } from '../src/core/operations.ts';
 import { buildToolDefs } from '../src/mcp/tool-defs.ts';
+import { upsertTakeRow } from '../src/core/takes-fence.ts';
 import {
   acceptTakeProposal,
   listTakeProposals,
@@ -290,6 +291,38 @@ describe('take proposal review helpers', () => {
     expect(engine.proposals.get(3)).toMatchObject({ status: 'pending', promoted_row_num: null });
   });
 
+  test('accept rejects unsafe proposal slugs before filesystem access', async () => {
+    const brainDir = makeBrainDir();
+    const engine = new FakeProposalEngine(brainDir);
+    engine.addProposal({ id: 7, page_slug: '../outside', claim_text: 'Should not escape brain dir' });
+
+    await expect(acceptTakeProposal(engine as unknown as BrainEngine, 7, { actedBy: 'test' })).rejects.toThrow('Invalid slug');
+    expect(engine.addedBatches).toHaveLength(0);
+  });
+
+  test('accept reuses an existing proposal markdown row on retry', async () => {
+    const brainDir = makeBrainDir();
+    const seededBody = upsertTakeRow('# Retry\n', {
+      claim: 'Already written',
+      kind: 'take',
+      holder: 'people/garry-tan',
+      weight: 0.7,
+      source: 'proposal:8',
+      active: true,
+    }).body;
+    const pagePath = writePage(brainDir, 'topics/retry', seededBody);
+    const engine = new FakeProposalEngine(brainDir);
+    engine.addPage({ id: 18, source_id: 'default', slug: 'topics/retry', effective_date: new Date('2024-03-02T00:00:00Z'), effective_date_source: 'frontmatter' });
+    engine.addProposal({ id: 8, page_slug: 'topics/retry', claim_text: 'Already written' });
+
+    const result = await acceptTakeProposal(engine as unknown as BrainEngine, 8, { actedBy: 'test' });
+
+    expect(result).toMatchObject({ ok: true, proposal_id: 8, row_num: 1, status: 'accepted', idempotent: false });
+    expect(engine.addedBatches).toHaveLength(1);
+    expect((engine.addedBatches[0][0] as Record<string, unknown>).row_num).toBe(1);
+    expect(readFileSync(pagePath, 'utf-8').match(/Already written/g)).toHaveLength(1);
+  });
+
   test('accept is idempotent after a proposal has already been promoted', async () => {
     const brainDir = makeBrainDir();
     writePage(brainDir, 'topics/done', '# Done\n');
@@ -330,6 +363,7 @@ describe('take proposal MCP operation schema', () => {
     expect(byName.takes_propose_list?.scope).toBe('read');
     expect(byName.takes_propose_accept?.scope).toBe('write');
     expect(byName.takes_propose_reject?.scope).toBe('write');
+    expect(byName.takes_propose_accept?.localOnly).toBe(true);
     expect(byName.takes_propose_accept.params.proposal_id.required).toBe(true);
     expect(byName.takes_propose_reject.params.proposal_id.required).toBe(true);
 
